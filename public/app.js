@@ -240,6 +240,7 @@ function renderizarPeliculas(data) {
                 <div class="mb-4">
                     <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Género:</strong> ${pelicula.Genero || '-'}</p>
                     <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Director:</strong> ${pelicula.Director || '-'}</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Actores principales:</strong> ${pelicula.Actores_principales || '-'}</p>
                 </div>
                 
                 <div class="flex gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
