@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "peliculas-ayn",
+    "site": "cineayn",
     "public": "public",
     "ignore": [
       "firebase.json",

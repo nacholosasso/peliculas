@@ -92,10 +92,30 @@ function parseDate(dateValue) {
     return isNaN(parsed.getTime()) ? null : parsed;
 }
 
+// Helper para Debounce (optimización del buscador)
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// Helper para prevenir XSS (Cross-Site Scripting) escapando HTML
+function escapeHTML(str) {
+    if (!str) return '';
+    return str.toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 // Cargar datos desde Firestore
 async function cargarPeliculas() {
     try {
-        const querySnapshot = await getDocs(collection(db, "peliculas")); // Asumiendo que tu colección se llama "peliculas"
+        const querySnapshot = await getDocs(collection(db, "Cine")); // Ahora busca en la colección "Cine"
         
         querySnapshot.forEach((doc) => {
             const data = doc.data();
@@ -108,7 +128,9 @@ async function cargarPeliculas() {
                 Pais: (data.Pais || "").toString().trim(),
                 Año: (data.Año || "").toString().trim(),
                 Fecha_Nacho_Date: parseDate(data.Fecha_Nacho),
-                Fecha_Ailu_Date: parseDate(data.Fecha_Ailu)
+                Fecha_Ailu_Date: parseDate(data.Fecha_Ailu),
+                nachoVio: (data["Nacho_vio?"] || "").toString().trim().toLowerCase() === "si",
+                ailuVio: (data["Ailu_vio?"] || "").toString().trim().toLowerCase() === "si"
             });
         });
 
@@ -145,20 +167,20 @@ function popularFiltros(data) {
     const paises = [...new Set(allPaises)].sort();
 
     tipos.forEach(tipo => {
-        tipoFilter.innerHTML += `<option value="${tipo}">${tipo}</option>`;
-        lastSeenTypeFilter.innerHTML += `<option value="${tipo}">${tipo}</option>`;
+        tipoFilter.innerHTML += `<option value="${escapeHTML(tipo)}">${escapeHTML(tipo)}</option>`;
+        lastSeenTypeFilter.innerHTML += `<option value="${escapeHTML(tipo)}">${escapeHTML(tipo)}</option>`;
     });
 
     generos.forEach(genero => {
-        generoFilter.innerHTML += `<option value="${genero}">${genero}</option>`;
+        generoFilter.innerHTML += `<option value="${escapeHTML(genero)}">${escapeHTML(genero)}</option>`;
     });
 
     anos.forEach(ano => {
-        anoFilter.innerHTML += `<option value="${ano}">${ano}</option>`;
+        anoFilter.innerHTML += `<option value="${escapeHTML(ano)}">${escapeHTML(ano)}</option>`;
     });
 
     paises.forEach(pais => {
-        paisFilter.innerHTML += `<option value="${pais}">${pais}</option>`;
+        paisFilter.innerHTML += `<option value="${escapeHTML(pais)}">${escapeHTML(pais)}</option>`;
     });
 }
 
@@ -184,14 +206,11 @@ function aplicarFiltros() {
         const coincideGenero = generoSeleccionado === "" || normalizarTexto(pelicula.Genero).includes(generoSeleccionado);
 
         // Filtro de Vistos (asumiendo que en tu sheet "Si" es que la vieron)
-        const nachoVio = normalizarTexto(pelicula["Nacho_vio?"]) === "si";
-        const ailuVio = normalizarTexto(pelicula["Ailu_vio?"]) === "si";
-
         let coincideVisto = true;
-        if (vistoSeleccionado === "Nacho") coincideVisto = nachoVio && !ailuVio;
-        if (vistoSeleccionado === "Ailu") coincideVisto = ailuVio && !nachoVio;
-        if (vistoSeleccionado === "Ambos") coincideVisto = nachoVio && ailuVio;
-        if (vistoSeleccionado === "Pendiente") coincideVisto = !nachoVio && !ailuVio;
+        if (vistoSeleccionado === "Nacho") coincideVisto = pelicula.nachoVio && !pelicula.ailuVio;
+        if (vistoSeleccionado === "Ailu") coincideVisto = pelicula.ailuVio && !pelicula.nachoVio;
+        if (vistoSeleccionado === "Ambos") coincideVisto = pelicula.nachoVio && pelicula.ailuVio;
+        if (vistoSeleccionado === "Pendiente") coincideVisto = !pelicula.nachoVio && !pelicula.ailuVio;
 
         // Filtros adicionales
         const coincideAno = anoSeleccionado === "" || normalizarTexto(pelicula.Año) === anoSeleccionado;
@@ -218,29 +237,26 @@ function renderizarPeliculas(data) {
         card.className = "bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow border border-gray-100 dark:border-gray-700 transition transform hover:-translate-y-1 hover:shadow-xl";
         
         // Identificadores visuales de quién la vio
-        const nachoVio = (pelicula["Nacho_vio?"] || "").toString().trim().toLowerCase() === "si";
-        const ailuVio = (pelicula["Ailu_vio?"] || "").toString().trim().toLowerCase() === "si";
-        
         const fechaNachoStr = pelicula.Fecha_Nacho_Date ? ` (${pelicula.Fecha_Nacho_Date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })})` : '';
-        const badgeNacho = nachoVio ? `<span class="bg-blue-600 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-check mr-1"></i>Nacho${fechaNachoStr}</span>` : '';
+        const badgeNacho = pelicula.nachoVio ? `<span class="bg-blue-600 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-check mr-1"></i>Nacho${fechaNachoStr}</span>` : '';
         
         const fechaAiluStr = pelicula.Fecha_Ailu_Date ? ` (${pelicula.Fecha_Ailu_Date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })})` : '';
-        const badgeAilu = ailuVio ? `<span class="bg-purple-600 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-check mr-1"></i>Ailu${fechaAiluStr}</span>` : '';
-        const badgePendiente = (!nachoVio && !ailuVio) ? `<span class="bg-amber-500 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-clock mr-1"></i>Pendiente</span>` : '';
+        const badgeAilu = pelicula.ailuVio ? `<span class="bg-purple-600 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-check mr-1"></i>Ailu${fechaAiluStr}</span>` : '';
+        const badgePendiente = (!pelicula.nachoVio && !pelicula.ailuVio) ? `<span class="bg-amber-500 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-clock mr-1"></i>Pendiente</span>` : '';
 
         card.innerHTML = `
             <div class="p-6">
                 <div class="flex justify-between items-start mb-4">
-                    <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">${pelicula.Tipo || 'N/A'}</span>
-                    <span class="text-xs text-gray-500">${pelicula.Año || ''}</span>
+                    <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">${escapeHTML(pelicula.Tipo || 'N/A')}</span>
+                    <span class="text-xs text-gray-500">${escapeHTML(pelicula.Año || '')}</span>
                 </div>
-                <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1">${pelicula.Nombre_en_español || 'Sin título'}</h2>
-                <h3 class="text-sm text-gray-600 dark:text-gray-400 mb-4 italic">${pelicula.Nombre_en_ingles || ''}</h3>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1">${escapeHTML(pelicula.Nombre_en_español || 'Sin título')}</h2>
+                <h3 class="text-sm text-gray-600 dark:text-gray-400 mb-4 italic">${escapeHTML(pelicula.Nombre_en_ingles || '')}</h3>
                 
                 <div class="mb-4">
-                    <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Género:</strong> ${pelicula.Genero || '-'}</p>
-                    <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Director:</strong> ${pelicula.Director || '-'}</p>
-                    <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Actores principales:</strong> ${pelicula.Actores_principales || '-'}</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Género:</strong> ${escapeHTML(pelicula.Genero || '-')}</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Director:</strong> ${escapeHTML(pelicula.Director || '-')}</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Actores principales:</strong> ${escapeHTML(pelicula.Actores_principales || '-')}</p>
                 </div>
                 
                 <div class="flex gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -259,10 +275,10 @@ function renderizarUltimasVistas() {
     const vistoPor = lastSeenByFilter.value;
     const tipo = lastSeenTypeFilter.value;
     const fechaKey = vistoPor === 'Nacho' ? 'Fecha_Nacho_Date' : 'Fecha_Ailu_Date';
-    const vioKey = vistoPor === 'Nacho' ? 'Nacho_vio?' : 'Ailu_vio?';
+    const vioKey = vistoPor === 'Nacho' ? 'nachoVio' : 'ailuVio';
 
     const ultimasVistas = peliculas
-        .filter(p => p[fechaKey] && normalizarTexto(p[vioKey]) === "si") // Debe tener fecha Y decir "SI" en la base de datos
+        .filter(p => p[fechaKey] && p[vioKey]) // Debe tener fecha Y decir "SI" en la base de datos
         .filter(p => tipo === "" || (p.Tipo || "").toString().trim() === tipo) // Filtrar por tipo si se seleccionó uno
         .sort((a, b) => b[fechaKey] - a[fechaKey]) // Ordenar por fecha descendente
         .slice(0, 10); // Tomar las últimas 10
@@ -282,9 +298,9 @@ function renderizarUltimasVistas() {
         const fechaVista = pelicula[fechaKey].toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
         card.innerHTML = `
-            <span class="text-xs font-bold text-purple-400 uppercase">${pelicula.Tipo || 'N/A'}</span>
-            <h3 class="text-md font-bold text-gray-900 dark:text-white truncate mt-1" title="${pelicula.Nombre_en_español || ''}">${pelicula.Nombre_en_español || 'Sin título'}</h3>
-            <p class="text-xs text-gray-600 dark:text-gray-400 italic truncate">${pelicula.Nombre_en_ingles || ''}</p>
+            <span class="text-xs font-bold text-purple-400 uppercase">${escapeHTML(pelicula.Tipo || 'N/A')}</span>
+            <h3 class="text-md font-bold text-gray-900 dark:text-white truncate mt-1" title="${escapeHTML(pelicula.Nombre_en_español || '')}">${escapeHTML(pelicula.Nombre_en_español || 'Sin título')}</h3>
+            <p class="text-xs text-gray-600 dark:text-gray-400 italic truncate">${escapeHTML(pelicula.Nombre_en_ingles || '')}</p>
             <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                 <p class="text-xs text-gray-600 dark:text-gray-500">Vista el: <span class="font-semibold text-gray-800 dark:text-gray-300">${fechaVista}</span></p>
             </div>
@@ -299,8 +315,8 @@ function renderizarEstadisticas(datosAProcesar = peliculas) {
     if (!statsGrid) return;
 
     const totalContenido = datosAProcesar.length;
-    const vistasNacho = datosAProcesar.filter(p => (p["Nacho_vio?"] || "").toString().trim().toLowerCase() === "si").length;
-    const vistasAilu = datosAProcesar.filter(p => (p["Ailu_vio?"] || "").toString().trim().toLowerCase() === "si").length;
+    const vistasNacho = datosAProcesar.filter(p => p.nachoVio).length;
+    const vistasAilu = datosAProcesar.filter(p => p.ailuVio).length;
 
     const conteoTipos = {};
     datosAProcesar.forEach(p => {
@@ -314,7 +330,7 @@ function renderizarEstadisticas(datosAProcesar = peliculas) {
                 <i class="fas ${icono} text-xl"></i>
             </div>
             <div class="overflow-hidden">
-                <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider truncate" title="${titulo}">${titulo}</p>
+                <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider truncate" title="${escapeHTML(titulo)}">${escapeHTML(titulo)}</p>
                 <p class="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white">${valor}</p>
             </div>
         </div>
@@ -344,7 +360,7 @@ function renderizarEstadisticas(datosAProcesar = peliculas) {
 }
 
 // Event Listeners para los filtros
-searchInput.addEventListener('input', aplicarFiltros);
+searchInput.addEventListener('input', debounce(aplicarFiltros, 300));
 tipoFilter.addEventListener('change', aplicarFiltros);
 generoFilter.addEventListener('change', aplicarFiltros);
 vistoFilter.addEventListener('change', aplicarFiltros);

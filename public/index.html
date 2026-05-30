@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catálogo de Películas | Nacho & Ailu</title>
+    <title>Catálogo de Cine | Nacho & Ailu</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -23,7 +23,7 @@
                 </h1>
                 <p class="text-gray-600 dark:text-gray-400 mt-2">Filtra y busca qué ver esta noche</p>
             </div>
-            <button id="themeToggle" class="p-3 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-inner" title="Cambiar tema">
+            <button id="themeToggle" class="p-3 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-inner" title="Cambiar tema" aria-label="Alternar modo oscuro y claro">
                 <i class="fas fa-moon text-xl" id="themeIcon"></i>
             </button>
         </div>
@@ -42,14 +42,14 @@
             <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Últimas 10 Vistas</h2>
             <div class="flex items-center gap-4">
                 <div class="w-full sm:w-48">
-                    <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Visto por</label>
+                    <label for="lastSeenByFilter" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Visto por</label>
                     <select id="lastSeenByFilter" class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
                         <option value="Nacho">Nacho</option>
                         <option value="Ailu">Ailu</option>
                     </select>
                 </div>
                 <div class="w-full sm:w-48">
-                    <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
+                    <label for="lastSeenTypeFilter" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
                     <select id="lastSeenTypeFilter" class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
                         <option value="">Todos</option>
                         <!-- Opciones se llenarán con JS -->
@@ -71,36 +71,36 @@
         <!-- Filters Section -->
         <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 mb-8 flex flex-wrap gap-4 items-end transition-colors">
             <div class="flex-1 min-w-[200px]">
-                <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Buscar por Nombre, Director o Actor</label>
+                <label for="searchInput" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Buscar por Nombre, Director o Actor</label>
                 <input type="text" id="searchInput" placeholder="Ej: El Padrino, Tarantino..." 
                     class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div class="w-full md:w-48">
-                <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
+                <label for="tipoFilter" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
                 <select id="tipoFilter" class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Todos</option>
                 </select>
             </div>
             <div class="w-full md:w-48">
-                <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Género</label>
+                <label for="generoFilter" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Género</label>
                 <select id="generoFilter" class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Todos</option>
                 </select>
             </div>
             <div class="w-full md:w-48">
-                <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Año</label>
+                <label for="anoFilter" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Año</label>
                 <select id="anoFilter" class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Todos</option>
                 </select>
             </div>
             <div class="w-full md:w-48">
-                <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">País</label>
+                <label for="paisFilter" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">País</label>
                 <select id="paisFilter" class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Todos</option>
                 </select>
             </div>
             <div class="w-full md:w-48">
-                <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">¿Quién la vio?</label>
+                <label for="vistoFilter" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">¿Quién la vio?</label>
                 <select id="vistoFilter" class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Cualquiera</option>
                     <option value="Nacho">Solo Nacho</option>
