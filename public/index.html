@@ -11,6 +11,7 @@
         }
     </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 min-h-screen font-sans transition-colors duration-200">
 
@@ -23,9 +24,14 @@
                 </h1>
                 <p class="text-gray-600 dark:text-gray-400 mt-2">Filtra y busca qué ver esta noche</p>
             </div>
-            <button id="themeToggle" class="p-3 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-inner" title="Cambiar tema" aria-label="Alternar modo oscuro y claro">
-                <i class="fas fa-moon text-xl" id="themeIcon"></i>
-            </button>
+            <div class="flex items-center gap-3">
+                <button id="btnAzar" class="bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 text-white font-semibold px-5 py-3 rounded-full shadow-lg transition flex items-center gap-2">
+                    <i class="fas fa-dice"></i> ¿Qué vemos hoy?
+                </button>
+                <button id="themeToggle" class="p-3 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-inner" title="Cambiar tema" aria-label="Alternar modo oscuro y claro">
+                    <i class="fas fa-moon text-xl" id="themeIcon"></i>
+                </button>
+            </div>
         </div>
     </header>
 
@@ -33,6 +39,29 @@
     <section class="container mx-auto px-4 mb-8">
         <div id="statsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             <!-- Las tarjetas se inyectarán aquí por JS -->
+        </div>
+    </section>
+
+    <!-- Análisis / Gráficos -->
+    <section class="container mx-auto px-4 mb-8">
+        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4">Análisis del Catálogo</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Progreso de Vistas</h3>
+                <div class="relative h-64"><canvas id="chartProgreso"></canvas></div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Top Géneros</h3>
+                <div class="relative h-64"><canvas id="chartGeneros"></canvas></div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Por Década</h3>
+                <div class="relative h-64"><canvas id="chartDecadas"></canvas></div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Top Países</h3>
+                <div class="relative h-64"><canvas id="chartPaises"></canvas></div>
+            </div>
         </div>
     </section>
 
@@ -67,12 +96,12 @@
 
     <!-- Main Content -->
     <main class="container mx-auto px-4">
-        
+
         <!-- Filters Section -->
         <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 mb-8 flex flex-wrap gap-4 items-end transition-colors">
             <div class="flex-1 min-w-[200px]">
                 <label for="searchInput" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Buscar por Nombre, Director o Actor</label>
-                <input type="text" id="searchInput" placeholder="Ej: El Padrino, Tarantino..." 
+                <input type="text" id="searchInput" placeholder="Ej: El Padrino, Tarantino..."
                     class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div class="w-full md:w-48">
@@ -107,6 +136,18 @@
                     <option value="Ailu">Solo Ailu</option>
                     <option value="Ambos">Ambos</option>
                     <option value="Pendiente">Pendiente de ver por ambos</option>
+                    <option value="SinFecha">⚠️ Vista sin fecha registrada</option>
+                </select>
+            </div>
+            <div class="w-full md:w-48">
+                <label for="ordenFilter" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Ordenar por</label>
+                <select id="ordenFilter" class="w-full bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Orden de la hoja</option>
+                    <option value="anio_desc">Año (más nuevas)</option>
+                    <option value="anio_asc">Año (más antiguas)</option>
+                    <option value="nombre_asc">Nombre (A-Z)</option>
+                    <option value="nombre_desc">Nombre (Z-A)</option>
+                    <option value="pendientes">Pendientes primero</option>
                 </select>
             </div>
             <div class="w-full md:w-auto">
@@ -127,8 +168,43 @@
         <div id="moviesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 hidden">
             <!-- Las tarjetas se inyectarán aquí por JS -->
         </div>
+
+        <!-- Cargar más -->
+        <div id="loadMoreContainer" class="text-center my-10 hidden">
+            <button id="btnCargarMas" class="bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 text-white font-semibold px-6 py-3 rounded-full shadow-lg transition">
+                <i class="fas fa-chevron-down mr-2"></i>Cargar más películas
+            </button>
+        </div>
     </main>
 
-    <script type="module" src="./app.js?v=2.0"></script>
+    <!-- Modal "¿Qué vemos hoy?" -->
+    <div id="modalAzar" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full mx-auto my-auto p-6 relative">
+            <button id="btnCerrarModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition" aria-label="Cerrar">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <div id="modalAzarContenido"></div>
+            <div class="flex gap-3 mt-6">
+                <button id="btnOtraVez" class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-4 py-3 rounded-lg shadow hover:opacity-90 transition">
+                    <i class="fas fa-dice mr-2"></i>Otra
+                </button>
+                <button id="btnCerrarModal2" class="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold px-4 py-3 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalle de Película -->
+    <div id="modalDetalle" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full mx-auto my-8 relative max-h-[90vh] overflow-y-auto">
+            <button id="btnCerrarDetalle" class="absolute top-4 right-4 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full w-9 h-9 flex items-center justify-center transition" aria-label="Cerrar">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+            <div id="modalDetalleContenido"></div>
+        </div>
+    </div>
+
+    <script type="module" src="./app.js?v=4.1"></script>
 </body>
 </html>
