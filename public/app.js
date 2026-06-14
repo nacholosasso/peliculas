@@ -16,6 +16,8 @@ const CAMPOS_ESPERADOS = [
 const TMDB_API_KEY = "5d3b5123341034799c3c939406a33eaa";
 const TMDB_IMG_BASE = "https://image.tmdb.org/t/p/w300";
 const TMDB_IMG_BASE_GRANDE = "https://image.tmdb.org/t/p/w500";
+const TMDB_BACKDROP_BASE = "https://image.tmdb.org/t/p/w780";
+const TMDB_PROVIDER_LOGO_BASE = "https://image.tmdb.org/t/p/w45";
 
 const TAMANIO_PAGINA = 24;
 
@@ -192,8 +194,9 @@ function gradientePorTipo(tipo) {
 }
 
 // --- Cargar póster desde TMDB de forma diferida (solo cuando la tarjeta es visible) ---
-const cacheTMDB = JSON.parse(localStorage.getItem('tmdbCache_v2') || '{}');
+const cacheTMDB = JSON.parse(localStorage.getItem('tmdbCache_v3') || '{}');
 const cacheTrailers = JSON.parse(localStorage.getItem('trailerCache_v1') || '{}');
+const cacheProveedores = JSON.parse(localStorage.getItem('providersCache_v1') || '{}');
 
 const observerPosters = new IntersectionObserver((entries, obs) => {
     entries.forEach(entry => {
@@ -204,7 +207,7 @@ const observerPosters = new IntersectionObserver((entries, obs) => {
     });
 }, { rootMargin: '300px' });
 
-// Busca en TMDB la película/serie y devuelve { id, tipo, poster_path, overview, vote_average } (cacheado)
+// Busca en TMDB la película/serie y devuelve { id, tipo, poster_path, backdrop_path, overview, vote_average } (cacheado)
 async function buscarInfoTMDB(titulo, anio, tipo) {
     if (!TMDB_API_KEY) return null;
 
@@ -226,6 +229,7 @@ async function buscarInfoTMDB(titulo, anio, tipo) {
                 id: resultado.id,
                 tipo: endpoint,
                 poster_path: resultado.poster_path || null,
+                backdrop_path: resultado.backdrop_path || null,
                 overview: resultado.overview || '',
                 vote_average: resultado.vote_average || 0
             };
@@ -236,7 +240,7 @@ async function buscarInfoTMDB(titulo, anio, tipo) {
     }
 
     cacheTMDB[clave] = info;
-    localStorage.setItem('tmdbCache_v2', JSON.stringify(cacheTMDB));
+    localStorage.setItem('tmdbCache_v3', JSON.stringify(cacheTMDB));
     return info;
 }
 
@@ -264,6 +268,32 @@ async function buscarTrailer(tmdbId, tipoTMDB) {
     cacheTrailers[clave] = videoKey;
     localStorage.setItem('trailerCache_v1', JSON.stringify(cacheTrailers));
     return videoKey;
+}
+
+// Busca en qué plataformas de streaming está disponible (Argentina) en TMDB (cacheado)
+async function buscarProveedores(tmdbId, tipoTMDB) {
+    if (!TMDB_API_KEY || !tmdbId) return null;
+
+    const clave = `${tipoTMDB}_${tmdbId}`;
+    if (cacheProveedores[clave] !== undefined) return cacheProveedores[clave];
+
+    let proveedores = null;
+    try {
+        const url = `https://api.themoviedb.org/3/${tipoTMDB}/${tmdbId}/watch/providers?api_key=${TMDB_API_KEY}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const ar = (data.results || {}).AR;
+        if (ar) {
+            const lista = ar.flatrate || ar.ads || ar.free || ar.rent || ar.buy || [];
+            proveedores = lista.map(p => ({ nombre: p.provider_name, logo: p.logo_path }));
+        }
+    } catch (e) {
+        return null;
+    }
+
+    cacheProveedores[clave] = proveedores;
+    localStorage.setItem('providersCache_v1', JSON.stringify(cacheProveedores));
+    return proveedores;
 }
 
 async function cargarPoster(elemento) {
@@ -846,6 +876,7 @@ async function abrirModalDetalle(pelicula) {
             <div class="flex flex-wrap gap-2 mb-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 ${badgeNacho}${badgeAilu}${badgePendiente}${badgeSinFecha}
             </div>
+            <div id="proveedoresTMDB" class="mb-4"></div>
             <div id="trailerTMDB"></div>
         </div>
     `;
@@ -858,6 +889,7 @@ async function abrirModalDetalle(pelicula) {
     const posterEl = modalDetalleContenido.querySelector('.poster-detalle');
     const sinopsisEl = modalDetalleContenido.querySelector('#sinopsisTMDB');
     const ratingEl = modalDetalleContenido.querySelector('#ratingTMDB');
+    const proveedoresEl = modalDetalleContenido.querySelector('#proveedoresTMDB');
     const trailerEl = modalDetalleContenido.querySelector('#trailerTMDB');
 
     if (!info) {
@@ -865,12 +897,29 @@ async function abrirModalDetalle(pelicula) {
         return;
     }
 
-    if (info.poster_path) pintarPoster(posterEl, info.poster_path, TMDB_IMG_BASE_GRANDE);
+    if (info.backdrop_path) {
+        pintarPoster(posterEl, info.backdrop_path, TMDB_BACKDROP_BASE);
+    } else if (info.poster_path) {
+        pintarPoster(posterEl, info.poster_path, TMDB_IMG_BASE_GRANDE);
+    }
 
     sinopsisEl.textContent = info.overview || 'Sin sinopsis disponible.';
 
     if (info.vote_average) {
         ratingEl.innerHTML = `<span class="bg-black/60 text-yellow-400 text-sm font-bold px-3 py-1 rounded-full shadow"><i class="fas fa-star mr-1"></i>${info.vote_average.toFixed(1)}</span>`;
+    }
+
+    const proveedores = await buscarProveedores(info.id, info.tipo);
+    if (modalDetalle.classList.contains('hidden') || !modalDetalleContenido.contains(proveedoresEl)) return;
+
+    if (proveedores && proveedores.length) {
+        proveedoresEl.innerHTML = `
+            <h4 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Dónde ver</h4>
+            <div class="flex flex-wrap gap-2 items-center">
+                ${proveedores.map(p => `<img src="${TMDB_PROVIDER_LOGO_BASE}${p.logo}" alt="${escapeHTML(p.nombre)}" title="${escapeHTML(p.nombre)}" class="w-9 h-9 rounded-lg shadow">`).join('')}
+            </div>
+            <p class="text-[10px] text-gray-400 mt-1">Datos de JustWatch</p>
+        `;
     }
 
     const videoKey = await buscarTrailer(info.id, info.tipo);
