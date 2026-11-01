@@ -42,29 +42,6 @@
         </div>
     </section>
 
-    <!-- Análisis / Gráficos -->
-    <section class="container mx-auto px-4 mb-8">
-        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4">Análisis del Catálogo</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Progreso de Vistas</h3>
-                <div class="relative h-64"><canvas id="chartProgreso"></canvas></div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Top Géneros</h3>
-                <div class="relative h-64"><canvas id="chartGeneros"></canvas></div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Por Década</h3>
-                <div class="relative h-64"><canvas id="chartDecadas"></canvas></div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Top Países</h3>
-                <div class="relative h-64"><canvas id="chartPaises"></canvas></div>
-            </div>
-        </div>
-    </section>
-
     <!-- Últimas 10 Vistas Section -->
     <section class="container mx-auto px-4 mb-8">
         <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
@@ -88,6 +65,29 @@
         </div>
         <div id="ultimasVistasContainer" class="flex gap-4 overflow-x-auto pb-4">
             <!-- Las tarjetas de últimas vistas se inyectarán aquí -->
+        </div>
+    </section>
+
+    <!-- Análisis / Gráficos -->
+    <section class="container mx-auto px-4 mb-8">
+        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4">Análisis del Catálogo</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Progreso de Vistas</h3>
+                <div class="relative h-64"><canvas id="chartProgreso"></canvas></div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Top Géneros</h3>
+                <div class="relative h-64"><canvas id="chartGeneros"></canvas></div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Vistas por Mes</h3>
+                <div class="relative h-64"><canvas id="chartMensual"></canvas></div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Top Países</h3>
+                <div class="relative h-64"><canvas id="chartPaises"></canvas></div>
+            </div>
         </div>
     </section>
 
@@ -164,9 +164,24 @@
             <p class="mt-4 text-gray-600 dark:text-gray-400">Cargando películas...</p>
         </div>
 
-        <!-- Movies Grid -->
-        <div id="moviesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 hidden">
-            <!-- Las tarjetas se inyectarán aquí por JS -->
+        <!-- Movies Table -->
+        <div id="moviesTableWrapper" class="overflow-x-auto bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-100 dark:border-gray-700 hidden">
+            <table class="w-full text-sm text-left border-collapse">
+                <thead class="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500 dark:text-gray-400">
+                    <tr>
+                        <th class="px-4 py-3 font-bold">Película</th>
+                        <th class="px-4 py-3 font-bold">Año</th>
+                        <th class="px-4 py-3 font-bold">Género</th>
+                        <th class="px-4 py-3 font-bold">Director</th>
+                        <th class="px-4 py-3 font-bold">Actores</th>
+                        <th class="px-4 py-3 font-bold">País</th>
+                        <th class="px-4 py-3 font-bold">Vista por</th>
+                    </tr>
+                </thead>
+                <tbody id="moviesGrid" class="divide-y divide-gray-100 dark:divide-gray-700">
+                    <!-- Las filas se inyectarán aquí por JS -->
+                </tbody>
+            </table>
         </div>
 
         <!-- Cargar más -->
@@ -195,16 +210,6 @@
         </div>
     </div>
 
-    <!-- Modal Detalle de Película -->
-    <div id="modalDetalle" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full mx-auto my-8 relative max-h-[90vh] overflow-y-auto">
-            <button id="btnCerrarDetalle" class="absolute top-4 right-4 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full w-9 h-9 flex items-center justify-center transition" aria-label="Cerrar">
-                <i class="fas fa-times text-lg"></i>
-            </button>
-            <div id="modalDetalleContenido"></div>
-        </div>
-    </div>
-
-    <script type="module" src="./app.js?v=4.1"></script>
+    <script type="module" src="./app.js?v=6.2"></script>
 </body>
 </html>

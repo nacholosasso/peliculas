@@ -11,14 +11,6 @@ const CAMPOS_ESPERADOS = [
     "Fecha_Nacho", "Fecha_Ailu"
 ];
 
-// --- Pósters (TMDB) ---
-// API Key (v3 auth) de https://www.themoviedb.org/settings/api
-const TMDB_API_KEY = "5d3b5123341034799c3c939406a33eaa";
-const TMDB_IMG_BASE = "https://image.tmdb.org/t/p/w300";
-const TMDB_IMG_BASE_GRANDE = "https://image.tmdb.org/t/p/w500";
-const TMDB_BACKDROP_BASE = "https://image.tmdb.org/t/p/w780";
-const TMDB_PROVIDER_LOGO_BASE = "https://image.tmdb.org/t/p/w45";
-
 const TAMANIO_PAGINA = 24;
 
 // Variables globales para almacenar y filtrar los datos
@@ -28,10 +20,11 @@ let datosRenderizados = [];
 let cantidadMostrada = 0;
 
 // Instancias de gráficos (para poder destruirlas/recrearlas)
-let chartProgreso, chartGeneros, chartDecadas, chartPaises;
+let chartProgreso, chartGeneros, chartMensual, chartPaises;
 
 // Elementos del DOM
 const moviesGrid = document.getElementById('moviesGrid');
+const moviesTableWrapper = document.getElementById('moviesTableWrapper');
 const loader = document.getElementById('loader');
 const searchInput = document.getElementById('searchInput');
 const tipoFilter = document.getElementById('tipoFilter');
@@ -57,22 +50,17 @@ const btnOtraVez = document.getElementById('btnOtraVez');
 const btnCerrarModal = document.getElementById('btnCerrarModal');
 const btnCerrarModal2 = document.getElementById('btnCerrarModal2');
 
-// Modal de detalle de película
-const modalDetalle = document.getElementById('modalDetalle');
-const modalDetalleContenido = document.getElementById('modalDetalleContenido');
-const btnCerrarDetalle = document.getElementById('btnCerrarDetalle');
-
 // --- Lógica de Modo Oscuro / Claro ---
 const themeToggleBtn = document.getElementById('themeToggle');
 const themeIcon = document.getElementById('themeIcon');
 const htmlElement = document.documentElement;
 
-// Comprobar preferencias guardadas
-if (localStorage.getItem('theme') === 'dark') {
+// Comprobar preferencias guardadas (modo oscuro por defecto, salvo que el usuario haya elegido claro)
+if (localStorage.getItem('theme') === 'light') {
+    htmlElement.classList.remove('dark');
+} else {
     htmlElement.classList.add('dark');
     themeIcon.classList.replace('fa-moon', 'fa-sun');
-} else {
-    htmlElement.classList.remove('dark');
 }
 
 themeToggleBtn.addEventListener('click', () => {
@@ -185,131 +173,6 @@ function iconoPorTipo(tipo) {
     return 'fa-film';
 }
 
-function gradientePorTipo(tipo) {
-    const t = (tipo || "").toLowerCase();
-    if (t.includes('serie')) return 'from-purple-500 to-indigo-600';
-    if (t.includes('docu')) return 'from-emerald-500 to-teal-600';
-    if (t.includes('corto')) return 'from-amber-500 to-orange-600';
-    return 'from-blue-500 to-indigo-600';
-}
-
-// --- Cargar póster desde TMDB de forma diferida (solo cuando la tarjeta es visible) ---
-const cacheTMDB = JSON.parse(localStorage.getItem('tmdbCache_v3') || '{}');
-const cacheTrailers = JSON.parse(localStorage.getItem('trailerCache_v1') || '{}');
-const cacheProveedores = JSON.parse(localStorage.getItem('providersCache_v1') || '{}');
-
-const observerPosters = new IntersectionObserver((entries, obs) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            cargarPoster(entry.target);
-            obs.unobserve(entry.target);
-        }
-    });
-}, { rootMargin: '300px' });
-
-// Busca en TMDB la película/serie y devuelve { id, tipo, poster_path, backdrop_path, overview, vote_average } (cacheado)
-async function buscarInfoTMDB(titulo, anio, tipo) {
-    if (!TMDB_API_KEY) return null;
-
-    const clave = `${tipo}_${titulo}_${anio}`;
-    if (cacheTMDB[clave] !== undefined) return cacheTMDB[clave];
-
-    const esSerie = (tipo || '').toLowerCase().includes('serie');
-    const endpoint = esSerie ? 'tv' : 'movie';
-    const paramAnio = esSerie ? 'first_air_date_year' : 'year';
-
-    let info = null;
-    try {
-        const url = `https://api.themoviedb.org/3/search/${endpoint}?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(titulo)}${anio ? `&${paramAnio}=${anio}` : ''}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const resultado = (data.results || [])[0];
-        if (resultado) {
-            info = {
-                id: resultado.id,
-                tipo: endpoint,
-                poster_path: resultado.poster_path || null,
-                backdrop_path: resultado.backdrop_path || null,
-                overview: resultado.overview || '',
-                vote_average: resultado.vote_average || 0
-            };
-        }
-    } catch (e) {
-        // Si falla, no se guarda en caché para reintentar más tarde
-        return null;
-    }
-
-    cacheTMDB[clave] = info;
-    localStorage.setItem('tmdbCache_v3', JSON.stringify(cacheTMDB));
-    return info;
-}
-
-// Busca el trailer de YouTube de una película/serie de TMDB (cacheado)
-async function buscarTrailer(tmdbId, tipoTMDB) {
-    if (!TMDB_API_KEY || !tmdbId) return null;
-
-    const clave = `${tipoTMDB}_${tmdbId}`;
-    if (cacheTrailers[clave] !== undefined) return cacheTrailers[clave];
-
-    let videoKey = null;
-    try {
-        for (const lang of ['es-ES', 'en-US']) {
-            const url = `https://api.themoviedb.org/3/${tipoTMDB}/${tmdbId}/videos?api_key=${TMDB_API_KEY}&language=${lang}`;
-            const res = await fetch(url);
-            const data = await res.json();
-            const videos = data.results || [];
-            const trailer = videos.find(v => v.site === 'YouTube' && v.type === 'Trailer') || videos.find(v => v.site === 'YouTube');
-            if (trailer) { videoKey = trailer.key; break; }
-        }
-    } catch (e) {
-        return null;
-    }
-
-    cacheTrailers[clave] = videoKey;
-    localStorage.setItem('trailerCache_v1', JSON.stringify(cacheTrailers));
-    return videoKey;
-}
-
-// Busca en qué plataformas de streaming está disponible (Argentina) en TMDB (cacheado)
-async function buscarProveedores(tmdbId, tipoTMDB) {
-    if (!TMDB_API_KEY || !tmdbId) return null;
-
-    const clave = `${tipoTMDB}_${tmdbId}`;
-    if (cacheProveedores[clave] !== undefined) return cacheProveedores[clave];
-
-    let proveedores = null;
-    try {
-        const url = `https://api.themoviedb.org/3/${tipoTMDB}/${tmdbId}/watch/providers?api_key=${TMDB_API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const ar = (data.results || {}).AR;
-        if (ar) {
-            const lista = ar.flatrate || ar.ads || ar.free || ar.rent || ar.buy || [];
-            proveedores = lista.map(p => ({ nombre: p.provider_name, logo: p.logo_path }));
-        }
-    } catch (e) {
-        return null;
-    }
-
-    cacheProveedores[clave] = proveedores;
-    localStorage.setItem('providersCache_v1', JSON.stringify(cacheProveedores));
-    return proveedores;
-}
-
-async function cargarPoster(elemento) {
-    const info = await buscarInfoTMDB(elemento.dataset.titulo, elemento.dataset.anio, elemento.dataset.tipo);
-    if (info && info.poster_path) pintarPoster(elemento, info.poster_path, TMDB_IMG_BASE);
-}
-
-function pintarPoster(elemento, posterPath, base = TMDB_IMG_BASE) {
-    if (!posterPath) return;
-    elemento.style.backgroundImage = `url(${base}${posterPath})`;
-    elemento.style.backgroundSize = 'cover';
-    elemento.style.backgroundPosition = 'center';
-    const icono = elemento.querySelector('i');
-    if (icono) icono.classList.add('hidden');
-}
-
 // Cargar datos directamente desde el Google Sheet (vía la API gviz)
 async function cargarPeliculas() {
     try {
@@ -368,7 +231,7 @@ async function cargarPeliculas() {
 
         // Mostrar resultados
         loader.classList.add('hidden');
-        moviesGrid.classList.remove('hidden');
+        moviesTableWrapper.classList.remove('hidden');
         datosFiltradosActuales = peliculas;
         renderizarUltimasVistas(); // Llamada inicial para las últimas vistas
         renderizarEstadisticas(); // Mostrar las tarjetas de totales
@@ -483,66 +346,45 @@ function aplicarFiltros() {
     renderizarGraficos(peliculasFiltradas); // Actualizar los gráficos según el filtro
 }
 
-// Crea el elemento DOM de una tarjeta de película
+// Crea la fila de tabla (<tr>) de una película
 function crearTarjetaPelicula(pelicula) {
-    const card = document.createElement('div');
-    card.className = "group bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow border border-gray-100 dark:border-gray-700 transition transform hover:-translate-y-1 hover:shadow-xl flex flex-col cursor-pointer";
+    const row = document.createElement('tr');
+    row.className = "hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors";
 
     // Identificadores visuales de quién la vio
     const fechaNachoStr = pelicula.Fecha_Nacho_Date ? ` (${formatearFecha(pelicula.Fecha_Nacho_Date)})` : '';
-    const badgeNacho = pelicula.nachoVio ? `<span class="bg-blue-600 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-check mr-1"></i>Nacho${fechaNachoStr}</span>` : '';
+    const badgeNacho = pelicula.nachoVio ? `<span class="bg-blue-600 text-xs px-2 py-1 rounded-full text-white shadow-sm whitespace-nowrap"><i class="fas fa-check mr-1"></i>Nacho${fechaNachoStr}</span>` : '';
 
     const fechaAiluStr = pelicula.Fecha_Ailu_Date ? ` (${formatearFecha(pelicula.Fecha_Ailu_Date)})` : '';
-    const badgeAilu = pelicula.ailuVio ? `<span class="bg-purple-600 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-check mr-1"></i>Ailu${fechaAiluStr}</span>` : '';
+    const badgeAilu = pelicula.ailuVio ? `<span class="bg-purple-600 text-xs px-2 py-1 rounded-full text-white shadow-sm whitespace-nowrap"><i class="fas fa-check mr-1"></i>Ailu${fechaAiluStr}</span>` : '';
 
-    const badgePendiente = (!pelicula.nachoVio && !pelicula.ailuVio) ? `<span class="bg-amber-500 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-clock mr-1"></i>Pendiente</span>` : '';
+    const badgePendiente = (!pelicula.nachoVio && !pelicula.ailuVio) ? `<span class="bg-amber-500 text-xs px-2 py-1 rounded-full text-white shadow-sm whitespace-nowrap"><i class="fas fa-clock mr-1"></i>Pendiente</span>` : '';
 
-    const badgeSinFecha = (pelicula.sinFechaNacho || pelicula.sinFechaAilu) ? `<span class="bg-red-500/90 text-xs px-2 py-1 rounded-full text-white shadow-sm" title="Marcada como vista pero sin fecha cargada en el Sheet"><i class="fas fa-triangle-exclamation mr-1"></i>Sin fecha</span>` : '';
+    const badgeSinFecha = (pelicula.sinFechaNacho || pelicula.sinFechaAilu) ? `<span class="bg-red-500/90 text-xs px-2 py-1 rounded-full text-white shadow-sm whitespace-nowrap" title="Marcada como vista pero sin fecha cargada en el Sheet"><i class="fas fa-triangle-exclamation mr-1"></i>Sin fecha</span>` : '';
 
     const chipsGenero = splitLista(pelicula.Genero).map(g =>
-        `<span class="${colorParaTexto(g)} text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">${escapeHTML(g)}</span>`
+        `<span class="${colorParaTexto(g)} text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap">${escapeHTML(g)}</span>`
     ).join(' ');
 
-    card.innerHTML = `
-        <div class="poster-placeholder relative h-40 w-full bg-gradient-to-br ${gradientePorTipo(pelicula.Tipo)} flex items-center justify-center"
-             data-titulo="${escapeHTML(pelicula.Nombre_en_ingles || pelicula.Nombre_en_español)}"
-             data-anio="${escapeHTML(pelicula.Año)}"
-             data-tipo="${escapeHTML(pelicula.Tipo)}">
-            <i class="fas ${iconoPorTipo(pelicula.Tipo)} text-5xl text-white/40"></i>
-            <span class="absolute top-2 right-2 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">${escapeHTML(pelicula.Año || '')}</span>
-            <span class="absolute top-2 left-2 bg-black/50 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">${escapeHTML(pelicula.Tipo || 'N/A')}</span>
-            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
-                <span class="text-white font-bold text-sm"><i class="fas fa-circle-info mr-1"></i>Ver detalles</span>
+    row.innerHTML = `
+        <td class="px-4 py-3 align-top max-w-[240px]">
+            <div class="flex items-start gap-2">
+                <i class="fas ${iconoPorTipo(pelicula.Tipo)} text-gray-400 dark:text-gray-500 mt-1 flex-shrink-0"></i>
+                <div class="overflow-hidden">
+                    <p class="font-bold text-gray-900 dark:text-white truncate">${escapeHTML(pelicula.Nombre_en_español || 'Sin título')}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 italic truncate">${escapeHTML(pelicula.Nombre_en_ingles || '')}</p>
+                </div>
             </div>
-        </div>
-        <div class="p-5 flex flex-col flex-1">
-            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1">${escapeHTML(pelicula.Nombre_en_español || 'Sin título')}</h2>
-            <h3 class="text-sm text-gray-600 dark:text-gray-400 mb-3 italic">${escapeHTML(pelicula.Nombre_en_ingles || '')}</h3>
-
-            <div class="flex flex-wrap gap-1 mb-3">${chipsGenero}</div>
-
-            <div class="mb-4 flex-1">
-                <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Director:</strong> ${escapeHTML(pelicula.Director || '-')}</p>
-                <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">Actores:</strong> ${escapeHTML(pelicula.Actores_principales || '-')}</p>
-                <p class="text-sm text-gray-700 dark:text-gray-300"><strong class="text-gray-900 dark:text-gray-500">País:</strong> ${escapeHTML(pelicula.Pais || '-')}</p>
-            </div>
-
-            <div class="flex flex-wrap gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
-                ${badgeNacho}
-                ${badgeAilu}
-                ${badgePendiente}
-                ${badgeSinFecha}
-            </div>
-        </div>
+        </td>
+        <td class="px-4 py-3 align-top text-gray-700 dark:text-gray-300 whitespace-nowrap">${escapeHTML(pelicula.Año || '-')}</td>
+        <td class="px-4 py-3 align-top"><div class="flex flex-wrap gap-1 max-w-[180px]">${chipsGenero}</div></td>
+        <td class="px-4 py-3 align-top text-gray-700 dark:text-gray-300 max-w-[160px] truncate">${escapeHTML(pelicula.Director || '-')}</td>
+        <td class="px-4 py-3 align-top text-gray-700 dark:text-gray-300 max-w-[220px] truncate" title="${escapeHTML(pelicula.Actores_principales || '')}">${escapeHTML(pelicula.Actores_principales || '-')}</td>
+        <td class="px-4 py-3 align-top text-gray-700 dark:text-gray-300 max-w-[140px] truncate">${escapeHTML(pelicula.Pais || '-')}</td>
+        <td class="px-4 py-3 align-top"><div class="flex flex-wrap gap-1">${badgeNacho}${badgeAilu}${badgePendiente}${badgeSinFecha}</div></td>
     `;
 
-    if (TMDB_API_KEY) {
-        observerPosters.observe(card.querySelector('.poster-placeholder'));
-    }
-
-    card.addEventListener('click', () => abrirModalDetalle(pelicula));
-
-    return card;
+    return row;
 }
 
 // Dibujar las tarjetas en la pantalla (con paginación)
@@ -552,7 +394,7 @@ function renderizarPeliculas(data) {
     cantidadMostrada = 0;
 
     if (data.length === 0) {
-        moviesGrid.innerHTML = `<p class="col-span-full text-center text-gray-600 dark:text-gray-400 py-10">No se encontraron resultados.</p>`;
+        moviesGrid.innerHTML = `<tr><td colspan="7" class="text-center text-gray-600 dark:text-gray-400 py-10">No se encontraron resultados.</td></tr>`;
         loadMoreContainer.classList.add('hidden');
         return;
     }
@@ -735,22 +577,23 @@ function renderizarGraficos(data) {
         }
     });
 
-    // --- Por década ---
-    const conteoDecadas = {};
-    data.forEach(p => {
-        const anio = parseInt(p.Año);
-        if (!isNaN(anio) && anio > 0) {
-            const decada = `${Math.floor(anio / 10) * 10}s`;
-            conteoDecadas[decada] = (conteoDecadas[decada] || 0) + 1;
-        }
-    });
-    const decadasOrdenadas = Object.entries(conteoDecadas).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+    // --- Vistas por mes (año actual) ---
+    const anioActual = new Date().getFullYear();
+    const vistasAnioActual = new Array(12).fill(0);
 
-    chartDecadas = actualizarChart(chartDecadas, 'chartDecadas', {
+    data.forEach(p => {
+        [p.Fecha_Nacho_Date, p.Fecha_Ailu_Date].forEach(fecha => {
+            if (fecha && fecha.getFullYear() === anioActual) vistasAnioActual[fecha.getMonth()]++;
+        });
+    });
+
+    chartMensual = actualizarChart(chartMensual, 'chartMensual', {
         type: 'bar',
         data: {
-            labels: decadasOrdenadas.map(([k]) => k),
-            datasets: [{ label: 'Películas', data: decadasOrdenadas.map(([, v]) => v), backgroundColor: '#6366f1', borderRadius: 6 }]
+            labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+            datasets: [
+                { label: `${anioActual}`, data: vistasAnioActual, backgroundColor: '#6366f1', borderRadius: 6 }
+            ]
         },
         options: {
             maintainAspectRatio: false,
@@ -831,119 +674,9 @@ modalAzar.addEventListener('click', (e) => {
     if (e.target === modalAzar) cerrarModalAzar();
 });
 
-// --- Modal de detalle de película ---
-function cerrarModalDetalle() {
-    modalDetalle.classList.add('hidden');
-    modalDetalle.classList.remove('flex');
-    modalDetalleContenido.innerHTML = '';
-}
-
-async function abrirModalDetalle(pelicula) {
-    modalDetalle.classList.remove('hidden');
-    modalDetalle.classList.add('flex');
-
-    const fechaNachoStr = pelicula.Fecha_Nacho_Date ? ` (${formatearFecha(pelicula.Fecha_Nacho_Date)})` : '';
-    const badgeNacho = pelicula.nachoVio ? `<span class="bg-blue-600 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-check mr-1"></i>Nacho${fechaNachoStr}</span>` : '';
-
-    const fechaAiluStr = pelicula.Fecha_Ailu_Date ? ` (${formatearFecha(pelicula.Fecha_Ailu_Date)})` : '';
-    const badgeAilu = pelicula.ailuVio ? `<span class="bg-purple-600 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-check mr-1"></i>Ailu${fechaAiluStr}</span>` : '';
-
-    const badgePendiente = (!pelicula.nachoVio && !pelicula.ailuVio) ? `<span class="bg-amber-500 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-clock mr-1"></i>Pendiente</span>` : '';
-
-    const badgeSinFecha = (pelicula.sinFechaNacho || pelicula.sinFechaAilu) ? `<span class="bg-red-500/90 text-xs px-2 py-1 rounded-full text-white shadow-sm"><i class="fas fa-triangle-exclamation mr-1"></i>Sin fecha</span>` : '';
-
-    const chips = splitLista(pelicula.Genero).map(g =>
-        `<span class="${colorParaTexto(g)} text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">${escapeHTML(g)}</span>`
-    ).join(' ');
-
-    modalDetalleContenido.innerHTML = `
-        <div class="poster-detalle relative h-64 sm:h-80 w-full bg-gradient-to-br ${gradientePorTipo(pelicula.Tipo)} rounded-t-2xl flex items-center justify-center">
-            <i class="fas ${iconoPorTipo(pelicula.Tipo)} text-6xl text-white/40"></i>
-            <div id="ratingTMDB" class="absolute bottom-3 right-3"></div>
-        </div>
-        <div class="p-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">${escapeHTML(pelicula.Nombre_en_español || 'Sin título')}</h2>
-            <h3 class="text-sm text-gray-600 dark:text-gray-400 italic mb-3">${escapeHTML(pelicula.Nombre_en_ingles || '')}${pelicula.Año ? ' · ' + escapeHTML(pelicula.Año) : ''}</h3>
-            <div class="flex flex-wrap gap-1 mb-4">${chips}</div>
-            <p id="sinopsisTMDB" class="text-sm text-gray-700 dark:text-gray-300 mb-4">
-                <i class="fas fa-spinner fa-spin"></i> Buscando información en TMDB...
-            </p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300 mb-4">
-                <p><strong class="text-gray-900 dark:text-gray-400">Director:</strong> ${escapeHTML(pelicula.Director || '-')}</p>
-                <p><strong class="text-gray-900 dark:text-gray-400">País:</strong> ${escapeHTML(pelicula.Pais || '-')}</p>
-                <p class="sm:col-span-2"><strong class="text-gray-900 dark:text-gray-400">Actores:</strong> ${escapeHTML(pelicula.Actores_principales || '-')}</p>
-            </div>
-            <div class="flex flex-wrap gap-2 mb-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                ${badgeNacho}${badgeAilu}${badgePendiente}${badgeSinFecha}
-            </div>
-            <div id="proveedoresTMDB" class="mb-4"></div>
-            <div id="trailerTMDB"></div>
-        </div>
-    `;
-
-    const info = await buscarInfoTMDB(pelicula.Nombre_en_ingles || pelicula.Nombre_en_español, pelicula.Año, pelicula.Tipo);
-
-    // Si el modal se cerró o se abrió otra película mientras esperábamos la respuesta, no pisar el contenido
-    if (modalDetalle.classList.contains('hidden') || !modalDetalleContenido.contains(document.getElementById('sinopsisTMDB'))) return;
-
-    const posterEl = modalDetalleContenido.querySelector('.poster-detalle');
-    const sinopsisEl = modalDetalleContenido.querySelector('#sinopsisTMDB');
-    const ratingEl = modalDetalleContenido.querySelector('#ratingTMDB');
-    const proveedoresEl = modalDetalleContenido.querySelector('#proveedoresTMDB');
-    const trailerEl = modalDetalleContenido.querySelector('#trailerTMDB');
-
-    if (!info) {
-        sinopsisEl.innerHTML = `<span class="text-gray-500 italic">No se encontró información adicional en TMDB.</span>`;
-        return;
-    }
-
-    if (info.backdrop_path) {
-        pintarPoster(posterEl, info.backdrop_path, TMDB_BACKDROP_BASE);
-    } else if (info.poster_path) {
-        pintarPoster(posterEl, info.poster_path, TMDB_IMG_BASE_GRANDE);
-    }
-
-    sinopsisEl.textContent = info.overview || 'Sin sinopsis disponible.';
-
-    if (info.vote_average) {
-        ratingEl.innerHTML = `<span class="bg-black/60 text-yellow-400 text-sm font-bold px-3 py-1 rounded-full shadow"><i class="fas fa-star mr-1"></i>${info.vote_average.toFixed(1)}</span>`;
-    }
-
-    const proveedores = await buscarProveedores(info.id, info.tipo);
-    if (modalDetalle.classList.contains('hidden') || !modalDetalleContenido.contains(proveedoresEl)) return;
-
-    if (proveedores && proveedores.length) {
-        proveedoresEl.innerHTML = `
-            <h4 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Dónde ver</h4>
-            <div class="flex flex-wrap gap-2 items-center">
-                ${proveedores.map(p => `<img src="${TMDB_PROVIDER_LOGO_BASE}${p.logo}" alt="${escapeHTML(p.nombre)}" title="${escapeHTML(p.nombre)}" class="w-9 h-9 rounded-lg shadow">`).join('')}
-            </div>
-            <p class="text-[10px] text-gray-400 mt-1">Datos de JustWatch</p>
-        `;
-    }
-
-    const videoKey = await buscarTrailer(info.id, info.tipo);
-    if (modalDetalle.classList.contains('hidden') || !modalDetalleContenido.contains(trailerEl)) return;
-
-    if (videoKey) {
-        trailerEl.innerHTML = `
-            <h4 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Trailer</h4>
-            <div class="relative w-full aspect-video rounded-lg overflow-hidden">
-                <iframe class="absolute inset-0 w-full h-full" src="https://www.youtube.com/embed/${videoKey}" title="Trailer" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-            </div>
-        `;
-    }
-}
-
-btnCerrarDetalle.addEventListener('click', cerrarModalDetalle);
-modalDetalle.addEventListener('click', (e) => {
-    if (e.target === modalDetalle) cerrarModalDetalle();
-});
-
-// Cerrar cualquier modal abierto con la tecla Escape
+// Cerrar el modal "¿Qué vemos hoy?" con la tecla Escape
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (!modalDetalle.classList.contains('hidden')) cerrarModalDetalle();
     if (!modalAzar.classList.contains('hidden')) cerrarModalAzar();
 });
 
