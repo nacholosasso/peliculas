@@ -9,7 +9,12 @@ para tener presente las edades de cada uno).
 
 - `public/index.html` — markup y Tailwind (vía CDN).
 - `public/app.js` — toda la lógica: fetch del Sheet, filtros, tabla, gráficos, modal "¿Qué vemos hoy?".
-- Deploy: `firebase deploy --only hosting`.
+- Deploy: automático vía GitHub Actions (`.github/workflows/firebase-hosting-deploy.yml`)
+  en cada push a `main`. Usa el secret de repo `FIREBASE_SERVICE_ACCOUNT_CINEAYN`
+  (service account `github-deploy-cineayn@gen-lang-client-0472064026.iam.gserviceaccount.com`
+  con rol `roles/firebasehosting.admin`). No hace falta carpeta local ni `firebase deploy`
+  manual: alcanza con editar y pushear (incluso desde github.com o Codespaces).
+  `firebase deploy --only hosting` sigue funcionando como alternativa manual si hiciera falta.
 
 ## La planilla (Google Sheet)
 
