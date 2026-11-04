@@ -31,6 +31,7 @@ const tipoFilter = document.getElementById('tipoFilter');
 const generoFilter = document.getElementById('generoFilter');
 const vistoFilter = document.getElementById('vistoFilter');
 const anoFilter = document.getElementById('anoFilter');
+const anoModo = document.getElementById('anoModo');
 const paisFilter = document.getElementById('paisFilter');
 const ordenFilter = document.getElementById('ordenFilter');
 const btnLimpiarFiltros = document.getElementById('btnLimpiarFiltros');
@@ -331,7 +332,17 @@ function aplicarFiltros() {
         if (vistoSeleccionado === "SinFecha") coincideVisto = pelicula.sinFechaNacho || pelicula.sinFechaAilu;
 
         // Filtros adicionales
-        const coincideAno = anoSeleccionado === "" || normalizarTexto(pelicula.Año) === anoSeleccionado;
+        // Año: "igual" compara exacto; "hasta" / "desde" incluyen el año elegido (<= / >=)
+        let coincideAno = true;
+        if (anoSeleccionado !== "") {
+            if (anoModo.value === "igual") {
+                coincideAno = normalizarTexto(pelicula.Año) === anoSeleccionado;
+            } else {
+                const anioPeli = parseInt(pelicula.Año);
+                const anioRef = parseInt(anoSeleccionado);
+                coincideAno = !isNaN(anioPeli) && (anoModo.value === "hasta" ? anioPeli <= anioRef : anioPeli >= anioRef);
+            }
+        }
         const coincidePais = paisSeleccionado === "" || normalizarTexto(pelicula.Pais).includes(paisSeleccionado);
 
         return coincideBusqueda && coincideTipo && coincideGenero && coincideVisto && coincideAno && coincidePais;
@@ -686,6 +697,7 @@ tipoFilter.addEventListener('change', aplicarFiltros);
 generoFilter.addEventListener('change', aplicarFiltros);
 vistoFilter.addEventListener('change', aplicarFiltros);
 anoFilter.addEventListener('change', aplicarFiltros);
+anoModo.addEventListener('change', aplicarFiltros);
 paisFilter.addEventListener('change', aplicarFiltros);
 ordenFilter.addEventListener('change', aplicarFiltros);
 
@@ -696,6 +708,7 @@ if (btnLimpiarFiltros) {
         tipoFilter.value = '';
         generoFilter.value = '';
         anoFilter.value = '';
+        anoModo.value = 'igual';
         paisFilter.value = '';
         vistoFilter.value = '';
         ordenFilter.value = '';
